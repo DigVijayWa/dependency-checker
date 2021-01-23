@@ -12,8 +12,9 @@ function fetchHTML(url) {
     });
 }
 
+let mapArray = [];
 function loadAllUrl(pageSize, firstUrl) {
-    let mapArray = [];
+    
     
     return new Promise((resolve, reject) => {
         for(var i=1;i<pageSize/10; i++) {
@@ -35,7 +36,12 @@ function getPageDetails(url, i) {
             data('.im-title').find('.im-usage').remove().text();
             let size = data('.im-title').find('a').length;
             for(var j=0;j<size;j++) {
-                pageItemArray.push({ link: data('.im-title').find('a')[j].attribs.href, text: data('.im-title').find('a')[j].children[0]['data']});
+                var text =  data('.im-title').find('a')[j].children[0]['data'];
+                var link = data('.im-title').find('a')[j].attribs.href;
+                pageItemArray.push({ link, text});
+                loadPageSize(baseUrl+link).then(function(resp){
+
+                }.bind({text}));
             }
             resolve(pageItemArray);
         });
@@ -47,20 +53,26 @@ function resolveTransientDependencies(url) {
 }
 
 function loadPageSize(url) {
-
-    fetchHTML(url).then(data=> {
-        let pageSize = findOutPageSize(data('h1').text());
-        if(pageSize > 0) {
-            loadAllUrl(pageSize, url).then(map=> {
-                fs.writeFileSync("mod.json", toStringMap(map)); 
-            });
-        };
+    return new Promise((resolve, reject) => {
+        fetchHTML(url).then(data=> {
+            let pageSize = findOutPageSize(data('h1').text());
+            if(pageSize > 0) {
+                loadAllUrl(pageSize, url).then(map=> {
+                    resolve(toStringMap(map));
+                });
+            }
+            else {
+                resolve("[]");
+            }
+        });
     });
 }
 
 
 
-loadPageSize("https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-cloudfoundry-connector/usages");
+loadPageSize("https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-cloudfoundry-connector/usages").then(data=>{
+    console.log('"spring-cloud-cloudfoundry-connector":'+data);
+});
 
 function toStringMap(mapArray) {
     let stringBuilder = '[';
