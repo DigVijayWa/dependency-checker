@@ -1,8 +1,8 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 const fs = require("fs");
-const { format } = require("path");
 const checkList = require("./checList");
+const dep = require("./mod.js");
 
 const baseUrl = "https://mvnrepository.com";
 
@@ -12,12 +12,12 @@ async function fetchHTML(url) {
   return cheerio.load(data);
 }
 
-async function loadAllUrl(pageSize, firstUrl, level) {
+async function loadAllUrl(itemCounts, firstUrl, level) {
   let mapArray = [];
-  let pages = pageSize / 10;
-  let itemCount = pageSize % 10;
+  let pages = itemCounts / 10;
+  let itemCount = itemCounts % 10;
   var i = 1;
-  for (i = 1; i <= pageSize / 10; i++) {
+  for (i = 1; i <= itemCounts / 10; i++) {
     const data = await getPageDetails(firstUrl, i, level);
     mapArray = mapArray.concat(data);
   }
@@ -46,9 +46,9 @@ async function getPageDetails(url, i, level) {
 async function loadPageSize(url, level) {
   if (level > 0) {
     const data = await fetchHTML(url);
-    let pageSize = findOutPageSize(data("h1").text());
-    if (pageSize > 0) {
-      const map = await loadAllUrl(pageSize, url, level);
+    let itemCount = findOutPageSize(data("h1").text());
+    if (itemCount > 0) {
+      const map = await loadAllUrl(itemCount, url, level);
       return map;
     } else {
       return [];
@@ -58,7 +58,7 @@ async function loadPageSize(url, level) {
   }
 }
 
-(async () => {
+/*(async () => {
   let data = await loadPageSize(
     "https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-cloudfoundry-connector/usages",
     2
@@ -76,8 +76,7 @@ async function loadPageSize(url, level) {
   });
 
   console.log("search complete ...");
-})();
-
+})();*/
 String.prototype.replaceOccurringDashes = function () {
   let stringBuilder = "";
   let flagDown = false;
@@ -94,13 +93,55 @@ String.prototype.replaceOccurringDashes = function () {
   return stringBuilder;
 }
 
+let total = [];
+let obj = dep["spring-cloud-cloudfoundry-connector"];
+
+obj.forEach(item=> flattenObject(item));
+
+console.log("search started");
+
+checkList.forEach(item=>{
+
+  total.forEach(innerItem=> {
+    if(item == innerItem) {
+      console.log("Dependency: "+item);
+    }
+  });
+})
+
+console.log("search completed");
+
+fs.writeFileSync(
+  "list.json",
+  total.toString()
+);
+
+function flattenObject(obj) {
+
+  let formatText = obj.text.toLowerCase().replace(/\s|::|\t/g, "-").replaceOccurringDashes();
+  total.push(formatText);
+
+  if(obj.data.length == 0) {
+    return;
+  }
+  else {
+    obj.data.forEach(item=> flattenObject(item));
+  }
+
+};
+
+
+
+
+
+
 function findDependency(mapArray, item) {
   if (mapArray.length == 0) {
     return;
   }
   mapArray.forEach((element) => {
     
-    let formatText = element.text.toLowerCase().replaceAll(/\s|::|\t/g, "-").replaceOccurringDashes();
+    let formatText = element.text.toLowerCase().replace(/\s|::|\t/g, "-").replaceOccurringDashes();
 
     if (item == formatText) {
       console.log(formatText + " dependency is causing the issue");
@@ -127,7 +168,7 @@ function toStringMap(mapArray) {
       '"text":"' +
       element.text +
       '",' +
-      `"${element.text}":` +
+      `"data":` +
       toStringMap(element.data) +
       "},";
   });
